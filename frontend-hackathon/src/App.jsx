@@ -52,143 +52,149 @@ const RenderizarRespuestaIA = ({ texto }) => {
 };
 
 // ==========================================
-// COMPONENTE DE HISTORIAL (PARA CIUDADANO)
+// NUEVO: COMPONENTE HISTORIAL DE ACTIVIDAD COMPLETO (CON FILTROS)
 // ==========================================
-function HistorialCiudadano({ usuario }) {
-  const [historial, setHistorial] = useState([]);
+const HistorialActividad = ({ usuario }) => {
+  const [actividades, setActividades] = useState([]);
+  const [filtro, setFiltro] = useState('Todos');
   const [cargando, setCargando] = useState(true);
-  const [filtro, setFiltro] = useState('todos');
 
-  useEffect(() => {
-    const cargarHistorial = async () => {
-      try {
-        const [meteoRes, llmRes, alertasRes] = await Promise.all([
-          fetch(`http://localhost:3000/api/consultas_meteo/${usuario.nickName}`),
-          fetch(`http://localhost:3000/api/consultas_llm/${usuario.nickName}`),
-          fetch(`http://localhost:3000/api/alertas_recibidas/${usuario.nickName}`)
-        ]);
+  const cargarActividad = async () => {
+    try {
+      setCargando(true);
+      // Obtener datos del endpoint de historial completo
+      const res = await fetch(`http://localhost:3000/api/historial_completo/${usuario.nickName}`);
+      const data = await res.json();
+      setActividades(data);
+    } catch (error) {
+      console.error("Error cargando historial completo:", error);
+      setActividades([]);
+    } finally {
+      setCargando(false);
+    }
+  };
 
-        const meteo = await meteoRes.json();
-        const llm = await llmRes.json();
-        const alertas = await alertasRes.json();
-
-        const combinado = [
-          ...meteo.map(m => ({ ...m, tipo: 'meteo', icono: '🌡️' })),
-          ...llm.map(l => ({ ...l, tipo: 'llm', icono: '🤖' })),
-          ...alertas.map(a => ({ ...a, tipo: 'alerta', icono: '⚠️' }))
-        ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
-        setHistorial(combinado);
-      } catch (error) {
-        console.error("Error cargando historial:", error);
-      } finally {
-        setCargando(false);
-      }
-    };
-
-    cargarHistorial();
+  useEffect(() => { 
+    cargarActividad(); 
   }, [usuario.nickName]);
 
-  const historialFiltrado = historial.filter(item => 
-    filtro === 'todos' ? true : item.tipo === filtro
-  );
+  // Lógica de filtrado (adaptada para cubrir todos los tipos)
+  const actividadesFiltradas = actividades.filter(item => {
+    if (filtro === 'Todos') return true;
+    if (filtro === 'Meteorología') return item.tipo === 'meteorologia' || item.tipo === 'meteo';
+    if (filtro === 'Consultas IA') return item.tipo === 'consulta' || item.tipo === 'llm';
+    if (filtro === 'Alertas') return item.tipo === 'alerta' || item.tipo === 'alertas';
+    return true;
+  });
+
+  // Formatear el detalle según el tipo de actividad
+  const formatearDetalle = (item) => {
+    if (item.tipo === 'meteorologia' || item.tipo === 'meteo') {
+      return `🌡️ Temp: ${item.temperatura || 'N/A'}°C | 💧 Humedad: ${item.humedad || 'N/A'}% | ☔ Lluvia: ${item.precipitacion || 'N/A'} mm | 💨 Viento: ${item.viento || 'N/A'} km/h`;
+    }
+    if (item.tipo === 'consulta' || item.tipo === 'llm') {
+      return item.detalle || (item.recomendacion ? item.recomendacion.substring(0, 150) + '...' : 'Sin detalle');
+    }
+    if (item.tipo === 'alerta' || item.tipo === 'alertas') {
+      return item.detalle || item.mensaje || 'Alerta sin contenido';
+    }
+    return item.detalle || 'Sin información disponible';
+  };
+
+  // Obtener título formateado
+  const formatearTitulo = (item) => {
+    if (item.tipo === 'meteorologia' || item.tipo === 'meteo') return 'Datos Meteorológicos';
+    if (item.tipo === 'consulta' || item.tipo === 'llm') return 'Consulta a IA';
+    if (item.tipo === 'alerta' || item.tipo === 'alertas') return 'Alerta Recibida';
+    return item.titulo || 'Actividad';
+  };
+
+  // Obtener color/icono según tipo
+  const obtenerEstiloTipo = (item) => {
+    if (item.tipo === 'meteorologia' || item.tipo === 'meteo') return { color: '#3498db', icono: '🌡️' };
+    if (item.tipo === 'consulta' || item.tipo === 'llm') return { color: '#f1c40f', icono: '🤖' };
+    if (item.tipo === 'alerta' || item.tipo === 'alertas') return { color: '#e74c3c', icono: '⚠️' };
+    return { color: '#2c3e50', icono: '📋' };
+  };
 
   if (cargando) return <div style={{ textAlign: 'center', padding: '20px' }}>⏳ Cargando historial...</div>;
 
   return (
-    <div style={{ marginTop: '30px', background: 'white', borderRadius: '12px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-      <h4 style={{ margin: '0 0 15px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
-        📋 Historial de Actividad
-        <span style={{ fontSize: '14px', color: '#666' }}>({historial.length} registros)</span>
-      </h4>
-
+    <div style={{ 
+      background: 'white', 
+      padding: '20px', 
+      borderRadius: '15px',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+      marginTop: '20px'
+    }}>
+      <h3 style={{ margin: '0 0 15px 0' }}>📋 Historial de Actividad ({actividadesFiltradas.length} registros)</h3>
+      
+      {/* BOTONES DE FILTRO */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
-        {['todos', 'meteo', 'llm', 'alertas'].map(tipo => (
-          <button
-            key={tipo}
-            onClick={() => setFiltro(tipo)}
+        {['Todos', 'Meteorología', 'Consultas IA', 'Alertas'].map(f => (
+          <button 
+            key={f}
+            onClick={() => setFiltro(f)}
             style={{
-              padding: '5px 15px',
+              padding: '8px 15px',
               borderRadius: '20px',
               border: 'none',
-              background: filtro === tipo ? '#3498db' : '#e0e0e0',
-              color: filtro === tipo ? 'white' : '#333',
+              backgroundColor: filtro === f ? '#3498db' : '#ecf0f1',
+              color: filtro === f ? 'white' : '#7f8c8d',
               cursor: 'pointer',
               fontSize: '14px'
             }}
           >
-            {tipo === 'todos' && '📊 Todos'}
-            {tipo === 'meteo' && '🌡️ Meteorología'}
-            {tipo === 'llm' && '🤖 Consultas IA'}
-            {tipo === 'alertas' && '⚠️ Alertas'}
+            {f}
           </button>
         ))}
       </div>
 
+      {/* LISTA DE REGISTROS */}
       <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-        {historialFiltrado.length === 0 ? (
-          <p style={{ textAlign: 'center', color: '#999', padding: '20px' }}>
-            No hay registros de {filtro}
+        {actividadesFiltradas.length === 0 ? (
+          <p style={{ textAlign: 'center', color: '#bdc3c7', padding: '20px' }}>
+            No hay registros de {filtro.toLowerCase()}
           </p>
         ) : (
-          historialFiltrado.map((item, index) => (
-            <div
-              key={index}
-              style={{
-                padding: '15px',
-                borderLeft: `4px solid ${
-                  item.tipo === 'meteo' ? '#3498db' : 
-                  item.tipo === 'llm' ? '#f1c40f' : '#e74c3c'
-                }`,
-                background: '#f8f9fa',
-                marginBottom: '10px',
-                borderRadius: '0 8px 8px 0',
-                fontSize: '14px'
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
-                <span style={{ fontWeight: 'bold' }}>
-                  {item.icono} {item.tipo === 'meteo' && 'Datos Meteorológicos'}
-                  {item.tipo === 'llm' && 'Consulta a la IA'}
-                  {item.tipo === 'alerta' && 'Alerta Recibida'}
-                </span>
-                <span style={{ color: '#666', fontSize: '12px' }}>
-                  {new Date(item.created_at).toLocaleString('es-ES')}
-                </span>
+          actividadesFiltradas.map((item, index) => {
+            const estilo = obtenerEstiloTipo(item);
+            return (
+              <div 
+                key={`${item.tipo}-${item.id || index}`} 
+                style={{ 
+                  padding: '15px', 
+                  borderBottom: '1px solid #eee', 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  gap: '5px' 
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ 
+                    fontWeight: 'bold', 
+                    color: estilo.color
+                  }}>
+                    {estilo.icono} {formatearTitulo(item)}
+                  </span>
+                  <small style={{ color: '#95a5a6', fontSize: '12px' }}>
+                    {new Date(item.fecha || item.created_at).toLocaleString('es-ES')}
+                  </small>
+                </div>
+                <p style={{ margin: 0, fontSize: '14px', color: '#34495e', lineHeight: '1.5' }}>
+                  {formatearDetalle(item)}
+                </p>
               </div>
-
-              {item.tipo === 'meteo' && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '10px' }}>
-                  <span>🌡️ Temp: {item.temperatura}°C</span>
-                  <span>💧 Humedad: {item.humedad}%</span>
-                  <span>☔ Lluvia: {item.precipitacion} mm</span>
-                  <span>💨 Viento: {item.viento} km/h</span>
-                </div>
-              )}
-
-              {item.tipo === 'llm' && (
-                <div style={{ marginTop: '10px' }}>
-                  <p style={{ background: 'white', padding: '10px', borderRadius: '5px', margin: 0 }}>
-                    {item.recomendacion.substring(0, 150)}...
-                  </p>
-                </div>
-              )}
-
-              {item.tipo === 'alerta' && (
-                <div style={{ marginTop: '10px', color: '#c0392b' }}>
-                  <strong>⚠️ {item.mensaje}</strong>
-                </div>
-              )}
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>
   );
-}
+};
 
 // ==========================================
-// COMPONENTE DE HISTORIAL (PARA ADMIN)
+// COMPONENTE DE HISTORIAL ADMIN (MANTENIDO PERO ACTUALIZADO)
 // ==========================================
 function HistorialAdmin({ usuario }) {
   const [historial, setHistorial] = useState([]);
@@ -209,10 +215,10 @@ function HistorialAdmin({ usuario }) {
         const alertas = await alertasRes.json();
 
         const combinado = [
-          ...meteo.map(m => ({ ...m, tipo: 'meteo', icono: '🌡️' })),
-          ...llm.map(l => ({ ...l, tipo: 'llm', icono: '🤖' })),
-          ...alertas.map(a => ({ ...a, tipo: 'alerta', icono: '⚠️' }))
-        ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+          ...meteo.map(m => ({ ...m, tipo: 'meteo', icono: '🌡️', fecha: m.created_at })),
+          ...llm.map(l => ({ ...l, tipo: 'llm', icono: '🤖', fecha: l.created_at })),
+          ...alertas.map(a => ({ ...a, tipo: 'alerta', icono: '⚠️', fecha: a.created_at }))
+        ].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
 
         setHistorial(combinado);
       } catch (error) {
@@ -296,7 +302,7 @@ function HistorialAdmin({ usuario }) {
                   )}
                 </div>
                 <span style={{ color: '#666', fontSize: '12px' }}>
-                  {new Date(item.created_at).toLocaleString('es-ES')}
+                  {new Date(item.fecha).toLocaleString('es-ES')}
                 </span>
               </div>
 
@@ -336,17 +342,33 @@ function HistorialAdmin({ usuario }) {
 }
 
 // ==========================================
-// 1. DASHBOARD CIUDADANO (IGUAL QUE ANTES)
+// 1. DASHBOARD CIUDADANO (CON NUEVO HISTORIAL DE ACTIVIDAD)
 // ==========================================
 function Dashboard({ usuario, onLogout }) {
   const [datosEmergencia, setDatosEmergencia] = useState(null);
   const [alertaOficial, setAlertaOficial] = useState(null);
   const [cargando, setCargando] = useState(true);
-  const [mostrarHistorial, setMostrarHistorial] = useState(false);
+  const [mostrarHistorialGeneral, setMostrarHistorialGeneral] = useState(false); // Historial de Actividad completo
+  
+  // Historial de consultas individual
+  const [historialConsultas, setHistorialConsultas] = useState([]);
+  const [mostrarHistorialConsultas, setMostrarHistorialConsultas] = useState(false);
   
   const [preguntaUsuario, setPreguntaUsuario] = useState("");
   const [respuestaIA, setRespuestaIA] = useState(null);
   const [cargandoChat, setCargandoChat] = useState(false);
+
+  // Función para obtener historial de consultas individual
+  const obtenerHistorialConsultas = async () => {
+    try {
+      const response = await fetch(`http://localhost:3000/api/historial/${usuario.nickName}`);
+      const data = await response.json();
+      setHistorialConsultas(data);
+      setMostrarHistorialConsultas(!mostrarHistorialConsultas);
+    } catch (error) {
+      console.error("Error al cargar historial de consultas:", error);
+    }
+  };
 
   const enviarPregunta = async () => {
     if (!preguntaUsuario) return;
@@ -367,6 +389,7 @@ function Dashboard({ usuario, onLogout }) {
       
       if (data.recomendacion && data.recomendacion.response) {
         setRespuestaIA(data.recomendacion.response);
+        obtenerHistorialConsultas(); // Actualizar historial de consultas
       } else {
         setRespuestaIA("No recibí una respuesta clara. Intenta de nuevo.");
       }
@@ -420,7 +443,7 @@ function Dashboard({ usuario, onLogout }) {
         <h2>🌤️ Panel de Ciudadano</h2>
         <div>
           <button 
-            onClick={() => setMostrarHistorial(!mostrarHistorial)}
+            onClick={() => setMostrarHistorialGeneral(!mostrarHistorialGeneral)}
             style={{ 
               background: '#3498db', 
               color: 'white', 
@@ -431,13 +454,13 @@ function Dashboard({ usuario, onLogout }) {
               marginRight: '10px'
             }}
           >
-            {mostrarHistorial ? '📋 Ocultar Historial' : '📋 Ver Historial'}
+            {mostrarHistorialGeneral ? '📋 Ocultar Historial de Actividad' : '📋 Ver Historial de Actividad'}
           </button>
           <button onClick={onLogout} style={{ background: '#e74c3c', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '5px', cursor: 'pointer' }}>Salir</button>
         </div>
       </header>
 
-      {!mostrarHistorial ? (
+      {!mostrarHistorialGeneral ? (
         <div style={{ maxWidth: '800px', margin: '0 auto' }}>
           {alertaOficial && (
             <div style={{ 
@@ -548,32 +571,101 @@ function Dashboard({ usuario, onLogout }) {
                 </div>
                 {respuestaIA && <RenderizarRespuestaIA texto={respuestaIA} />}
               </div>
+
+              {/* Historial de Consultas Individual */}
+              <div style={{ marginTop: '30px' }}>
+                <button 
+                  onClick={obtenerHistorialConsultas}
+                  style={{
+                    backgroundColor: '#34495e',
+                    color: 'white',
+                    padding: '10px 20px',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  {mostrarHistorialConsultas ? 'Hide History' : '📜 Ver mi Historial de Consultas'}
+                </button>
+
+                {mostrarHistorialConsultas && (
+                  <div style={{ 
+                    marginTop: '15px', 
+                    maxHeight: '400px', 
+                    overflowY: 'auto', 
+                    backgroundColor: 'rgba(255,255,255,0.8)',
+                    padding: '15px',
+                    borderRadius: '12px',
+                    border: '1px solid #ddd'
+                  }}>
+                    {historialConsultas.length === 0 ? (
+                      <p>No tienes consultas guardadas todavía.</p>
+                    ) : (
+                      historialConsultas.map((item) => (
+                        <div key={item.id} style={{ 
+                          marginBottom: '15px', 
+                          paddingBottom: '10px', 
+                          borderBottom: '1px solid #eee' 
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#7f8c8d' }}>
+                            <span>📅 {new Date(item.created_at).toLocaleString()}</span>
+                          </div>
+                          <p style={{ margin: '5px 0', fontWeight: 'bold', color: '#2c3e50' }}>
+                            ❓ {item.pregunta}
+                          </p>
+                          <p style={{ margin: '5px 0', fontSize: '0.9rem', color: '#34495e', fontStyle: 'italic' }}>
+                            🤖 {item.respuesta.length > 200 ? item.respuesta.substring(0, 200) + '...' : item.respuesta}
+                          </p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
             </>
           )}
         </div>
       ) : (
-        <HistorialCiudadano usuario={usuario} />
+        // REEMPLAZAMOS EL HISTORIAL ANTIGUO POR EL NUEVO COMPONENTE HistorialActividad
+        <HistorialActividad usuario={usuario} />
       )}
     </div>
   );
 }
 
 // ==========================================
-// 2. PANEL DE ADMIN ACTUALIZADO ✅
+// 2. PANEL DE ADMIN ACTUALIZADO
 // ==========================================
 function AdminPanel({ usuario, onLogout }) {
   const [mensaje, setMensaje] = useState("");
   const [enviado, setEnviado] = useState(false);
-  const [mostrarHistorial, setMostrarHistorial] = useState(false);
+  const [mostrarHistorialGeneral, setMostrarHistorialGeneral] = useState(false);
 
-  // NUEVO: Datos para el admin
+  // Historial de consultas admin
+  const [historialConsultasAdmin, setHistorialConsultasAdmin] = useState([]);
+  const [mostrarHistorialConsultasAdmin, setMostrarHistorialConsultasAdmin] = useState(false);
+
   const [datosEmergenciaAdmin, setDatosEmergenciaAdmin] = useState(null);
   const [cargandoAdmin, setCargandoAdmin] = useState(true);
   const [preguntaAdmin, setPreguntaAdmin] = useState("");
   const [respuestaAdminIA, setRespuestaAdminIA] = useState(null);
   const [cargandoChatAdmin, setCargandoChatAdmin] = useState(false);
 
-  // Enviar alerta
+  const obtenerHistorialConsultasAdmin = async () => {
+    try {
+      const response = await fetch(`http://localhost:3000/api/historial/${usuario.nickName}`);
+      const data = await response.json();
+      setHistorialConsultasAdmin(data);
+      setMostrarHistorialConsultasAdmin(!mostrarHistorialConsultasAdmin);
+    } catch (error) {
+      console.error("Error al cargar historial de consultas admin:", error);
+    }
+  };
+
   const enviarAlerta = async () => {
     if (!mensaje.trim()) return;
     try {
@@ -596,7 +688,6 @@ function AdminPanel({ usuario, onLogout }) {
     }
   };
 
-  // NUEVO: Consulta IA para ADMIN
   const enviarPreguntaAdmin = async () => {
     if (!preguntaAdmin) return;
     setRespuestaAdminIA("Pensando...");
@@ -616,6 +707,7 @@ function AdminPanel({ usuario, onLogout }) {
       
       if (data.recomendacion && data.recomendacion.response) {
         setRespuestaAdminIA(data.recomendacion.response);
+        obtenerHistorialConsultasAdmin();
       } else {
         setRespuestaAdminIA("No recibí una respuesta clara. Intenta de nuevo.");
       }
@@ -626,7 +718,6 @@ function AdminPanel({ usuario, onLogout }) {
     }
   };
 
-  // Cargar datos meteorológicos para ADMIN
   useEffect(() => {
     const cargarDatosAdmin = async () => {
       try {
@@ -648,7 +739,7 @@ function AdminPanel({ usuario, onLogout }) {
         <h2>🛡️ Panel de Control: Backoffice</h2>
         <div>
           <button 
-            onClick={() => setMostrarHistorial(!mostrarHistorial)}
+            onClick={() => setMostrarHistorialGeneral(!mostrarHistorialGeneral)}
             style={{ 
               background: '#3498db', 
               color: 'white', 
@@ -659,13 +750,13 @@ function AdminPanel({ usuario, onLogout }) {
               marginRight: '10px'
             }}
           >
-            {mostrarHistorial ? '📊 Ocultar Historial' : '📊 Ver Historial'}
+            {mostrarHistorialGeneral ? '📊 Ocultar Historial Global' : '📊 Ver Historial Global'}
           </button>
           <button onClick={onLogout} style={{ background: '#e74c3c', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '5px', cursor: 'pointer' }}>Salir</button>
         </div>
       </header>
 
-      {!mostrarHistorial ? (
+      {!mostrarHistorialGeneral ? (
         <div style={{ maxWidth: '800px', margin: '0 auto' }}>
           
           {/* PANEL PARA ENVIAR ALERTAS */}
@@ -695,7 +786,7 @@ function AdminPanel({ usuario, onLogout }) {
             {enviado && <p style={{ color: '#27ae60', marginTop: '10px', fontWeight: '500' }}>✅ Alerta enviada correctamente</p>}
           </div>
 
-          {/* NUEVO: DATOS METEOROLÓGICOS PARA ADMIN */}
+          {/* DATOS METEOROLÓGICOS ADMIN */}
           {cargandoAdmin ? (
             <p>⏳ Cargando datos meteorológicos...</p>
           ) : (
@@ -716,7 +807,7 @@ function AdminPanel({ usuario, onLogout }) {
                 </div>
               </div>
 
-              {/* NUEVO: CHAT IA PARA ADMIN */}
+              {/* CHAT IA ADMIN */}
               <div style={{ 
                 backgroundColor: 'rgba(255,255,255,0.9)', 
                 padding: '20px', 
@@ -751,6 +842,61 @@ function AdminPanel({ usuario, onLogout }) {
                   </button>
                 </div>
                 {respuestaAdminIA && <RenderizarRespuestaIA texto={respuestaAdminIA} />}
+              </div>
+
+              {/* HISTORIAL DE CONSULTAS ADMIN */}
+              <div style={{ marginTop: '30px' }}>
+                <button 
+                  onClick={obtenerHistorialConsultasAdmin}
+                  style={{
+                    backgroundColor: '#34495e',
+                    color: 'white',
+                    padding: '10px 20px',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  {mostrarHistorialConsultasAdmin ? 'Hide History' : '📜 Ver mi Historial de Consultas'}
+                </button>
+
+                {mostrarHistorialConsultasAdmin && (
+                  <div style={{ 
+                    marginTop: '15px', 
+                    maxHeight: '400px', 
+                    overflowY: 'auto', 
+                    backgroundColor: 'rgba(255,255,255,0.8)',
+                    padding: '15px',
+                    borderRadius: '12px',
+                    border: '1px solid #ddd'
+                  }}>
+                    {historialConsultasAdmin.length === 0 ? (
+                      <p>No tienes consultas guardadas todavía.</p>
+                    ) : (
+                      historialConsultasAdmin.map((item) => (
+                        <div key={item.id} style={{ 
+                          marginBottom: '15px', 
+                          paddingBottom: '10px', 
+                          borderBottom: '1px solid #eee' 
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#7f8c8d' }}>
+                            <span>📅 {new Date(item.created_at).toLocaleString()}</span>
+                          </div>
+                          <p style={{ margin: '5px 0', fontWeight: 'bold', color: '#2c3e50' }}>
+                            ❓ {item.pregunta}
+                          </p>
+                          <p style={{ margin: '5px 0', fontSize: '0.9rem', color: '#34495e', fontStyle: 'italic' }}>
+                            🤖 {item.respuesta.length > 200 ? item.respuesta.substring(0, 200) + '...' : item.respuesta}
+                          </p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
             </>
           )}

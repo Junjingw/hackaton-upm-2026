@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "@rails/actioncable": "^8.1.200",
+    "keycloak-js": "^26.2.3"
+  }
+}

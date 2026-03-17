@@ -24,4 +24,7 @@ Rails.application.routes.draw do
   get '/api/alerta_oficial', to: 'backoffice#historial_alertas'
 
   post '/api/preguntar', to: 'emergencias#preguntar'
+
+  get '/api/historial/:nickName', to: 'emergencias#obtener_historial'
+  get '/api/historial_completo/:nickName', to: 'emergencias#historial_completo'
 end

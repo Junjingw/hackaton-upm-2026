@@ -10,13 +10,22 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_03_17_103016) do
+ActiveRecord::Schema[8.1].define(version: 2026_03_17_152823) do
   create_table "alerta", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "mensaje"
     t.string "provincia"
     t.string "tipo"
     t.datetime "updated_at", null: false
+  end
+
+  create_table "consulta", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.text "pregunta"
+    t.text "respuesta"
+    t.datetime "updated_at", null: false
+    t.integer "user_id", null: false
+    t.index ["user_id"], name: "index_consulta_on_user_id"
   end
 
   create_table "users", force: :cascade do |t|
@@ -29,4 +38,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_17_103016) do
     t.string "tipoVivienda"
     t.datetime "updated_at", null: false
   end
+
+  add_foreign_key "consulta", "users"
 end

@@ -43,32 +43,79 @@ def preguntar
   pregunta_ciudadano = params[:pregunta]
   token = UPM_BEARER_TOKEN
 
-  # 1. Obtenemos el clima actual para que la respuesta sea precisa
+  # 1. Obtenemos el clima actual
   clima_data = fetch_weather(token, true)
 
-  # 2. Creamos el System Prompt para el chat (basado en el perfil)
-  # Reutilizamos tu lógica de personalización
+  # 2. Prompt personalizado
   system_prompt = personalizar_prompt_segun_perfil(user, clima_data)
   system_prompt += "\nINSTRUCCIÓN ADICIONAL: El usuario te hará una pregunta específica. Respóndela basándote en su perfil y el clima actual."
 
-  # 3. El User Prompt es la pregunta directa del ciudadano
   user_prompt = "Pregunta del ciudadano: #{pregunta_ciudadano}"
 
   begin
-    # LLAMADA A LA API DE LA UPM (que ya tienes definida abajo)
+    # 3. Llamada a la IA
     llm_response = fetch_llm_prompt(token, system_prompt, user_prompt)
     
-    # Devolvemos la respuesta con la estructura que espera tu React
+    # Extraemos la respuesta final
+    texto_respuesta = llm_response["response"] || llm_response["answer"] || "No tengo una respuesta clara."
+
+    # === NUEVO: GUARDADO EN EL HISTORIAL ===
+    # Intentamos guardar la consulta en la DB (asegúrate de haber hecho la migración)
+    begin
+      Consulta.create!(
+        user: user, 
+        pregunta: pregunta_ciudadano, 
+        respuesta: texto_respuesta
+      )
+    rescue => e
+      puts "Error guardando en historial: #{e.message}"
+      # No bloqueamos la respuesta al usuario aunque falle el historial
+    end
+    # ======================================
+
     render json: { 
       recomendacion: { 
-        response: llm_response["response"] || llm_response["answer"] || "No tengo una respuesta clara en este momento." 
+        response: texto_respuesta
       } 
     }
   rescue => e
     render json: { recomendacion: { response: "La IA de emergencias no responde. Por favor, contacta con el 112." } }
   end
 end
+def obtener_historial
+  user = User.find_by(nickName: params[:nickName])
+  if user
+    # Devolvemos las últimas 10 consultas
+    render json: user.consultas.order(created_at: :desc).limit(10)
+  else
+    render json: [], status: :not_found
+  end
+end
 
+def historial_completo
+  user = User.find_by(nickName: params[:nickName])
+  return render json: [] if user.nil?
+
+  # 1. Recogemos las consultas a la IA (Lo que acabamos de crear)
+  consultas = user.consultas.map do |c|
+    { id: c.id, tipo: 'consulta', titulo: "Consulta IA: #{c.pregunta.truncate(30)}", 
+      detalle: c.respuesta, fecha: c.created_at }
+  end
+
+  # 2. Recogemos las alertas oficiales (de la tabla Alerta)
+  alertas = Alerta.all.map do |a|
+    { id: a.id, tipo: 'alerta', titulo: "ALERTA OFICIAL", 
+      detalle: a.mensaje, fecha: a.created_at }
+  end
+
+  # 3. Recogemos registros meteorológicos (Si los guardas en DB, si no, simulamos uno actual)
+  # Aquí asumo que tienes una tabla 'ClimaRecord' o similar. Si no, añade solo los dos anteriores.
+  
+  # Combinamos todo y ordenamos por fecha (de más reciente a más antiguo)
+  todo = (consultas + alertas).sort_by { |item| item[:fecha] }.reverse
+
+  render json: todo
+end
   private
 
   def fetch_weather(token, disaster)
