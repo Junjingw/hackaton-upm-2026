@@ -13,17 +13,16 @@ const limpiarTextoIA = (texto) => {
 };
 
 // ==========================================
-// COMPONENTE DE HISTORIAL (NUEVO)
+// COMPONENTE DE HISTORIAL (PARA CIUDADANO)
 // ==========================================
-function Historial({ usuario }) {
+function HistorialCiudadano({ usuario }) {
   const [historial, setHistorial] = useState([]);
   const [cargando, setCargando] = useState(true);
-  const [filtro, setFiltro] = useState('todos'); // 'todos', 'meteo', 'llm', 'alertas'
+  const [filtro, setFiltro] = useState('todos');
 
   useEffect(() => {
     const cargarHistorial = async () => {
       try {
-        // Cargar los tres tipos de registros
         const [meteoRes, llmRes, alertasRes] = await Promise.all([
           fetch(`http://localhost:3000/api/consultas_meteo/${usuario.nickName}`),
           fetch(`http://localhost:3000/api/consultas_llm/${usuario.nickName}`),
@@ -34,7 +33,6 @@ function Historial({ usuario }) {
         const llm = await llmRes.json();
         const alertas = await alertasRes.json();
 
-        // Combinar y ordenar por fecha
         const combinado = [
           ...meteo.map(m => ({ ...m, tipo: 'meteo', icono: '🌡️' })),
           ...llm.map(l => ({ ...l, tipo: 'llm', icono: '🤖' })),
@@ -65,7 +63,6 @@ function Historial({ usuario }) {
         <span style={{ fontSize: '14px', color: '#666' }}>({historial.length} registros)</span>
       </h4>
 
-      {/* Filtros */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
         {['todos', 'meteo', 'llm', 'alertas'].map(tipo => (
           <button
@@ -89,7 +86,6 @@ function Historial({ usuario }) {
         ))}
       </div>
 
-      {/* Listado */}
       <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
         {historialFiltrado.length === 0 ? (
           <p style={{ textAlign: 'center', color: '#999', padding: '20px' }}>
@@ -122,7 +118,6 @@ function Historial({ usuario }) {
                 </span>
               </div>
 
-              {/* Contenido según tipo */}
               {item.tipo === 'meteo' && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '10px' }}>
                   <span>🌡️ Temp: {item.temperatura}°C</span>
@@ -143,6 +138,155 @@ function Historial({ usuario }) {
               {item.tipo === 'alerta' && (
                 <div style={{ marginTop: '10px', color: '#c0392b' }}>
                   <strong>⚠️ {item.mensaje}</strong>
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// COMPONENTE DE HISTORIAL (PARA ADMIN)
+// ==========================================
+function HistorialAdmin({ usuario }) {
+  const [historial, setHistorial] = useState([]);
+  const [cargando, setCargando] = useState(true);
+  const [filtro, setFiltro] = useState('todos');
+
+  useEffect(() => {
+    const cargarHistorial = async () => {
+      try {
+        // El admin ve TODAS las consultas de todos los ciudadanos
+        const [meteoRes, llmRes, alertasRes] = await Promise.all([
+          fetch(`http://localhost:3000/api/admin/consultas_meteo`),
+          fetch(`http://localhost:3000/api/admin/consultas_llm`),
+          fetch(`http://localhost:3000/api/admin/alertas_emitidas`)
+        ]);
+
+        const meteo = await meteoRes.json();
+        const llm = await llmRes.json();
+        const alertas = await alertasRes.json();
+
+        const combinado = [
+          ...meteo.map(m => ({ ...m, tipo: 'meteo', icono: '🌡️' })),
+          ...llm.map(l => ({ ...l, tipo: 'llm', icono: '🤖' })),
+          ...alertas.map(a => ({ ...a, tipo: 'alerta', icono: '⚠️' }))
+        ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+        setHistorial(combinado);
+      } catch (error) {
+        console.error("Error cargando historial admin:", error);
+      } finally {
+        setCargando(false);
+      }
+    };
+
+    cargarHistorial();
+  }, []);
+
+  const historialFiltrado = historial.filter(item => 
+    filtro === 'todos' ? true : item.tipo === filtro
+  );
+
+  if (cargando) return <div style={{ textAlign: 'center', padding: '20px' }}>⏳ Cargando historial global...</div>;
+
+  return (
+    <div style={{ marginTop: '30px', background: 'white', borderRadius: '12px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+      <h4 style={{ margin: '0 0 15px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+        📊 Historial Global del Sistema
+        <span style={{ fontSize: '14px', color: '#666' }}>({historial.length} registros totales)</span>
+      </h4>
+
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
+        {['todos', 'meteo', 'llm', 'alertas'].map(tipo => (
+          <button
+            key={tipo}
+            onClick={() => setFiltro(tipo)}
+            style={{
+              padding: '5px 15px',
+              borderRadius: '20px',
+              border: 'none',
+              background: filtro === tipo ? '#3498db' : '#e0e0e0',
+              color: filtro === tipo ? 'white' : '#333',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+          >
+            {tipo === 'todos' && '📊 Todos'}
+            {tipo === 'meteo' && '🌡️ Meteorología'}
+            {tipo === 'llm' && '🤖 Consultas IA'}
+            {tipo === 'alertas' && '⚠️ Alertas'}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
+        {historialFiltrado.length === 0 ? (
+          <p style={{ textAlign: 'center', color: '#999', padding: '20px' }}>
+            No hay registros de {filtro}
+          </p>
+        ) : (
+          historialFiltrado.map((item, index) => (
+            <div
+              key={index}
+              style={{
+                padding: '15px',
+                borderLeft: `4px solid ${
+                  item.tipo === 'meteo' ? '#3498db' : 
+                  item.tipo === 'llm' ? '#f1c40f' : '#e74c3c'
+                }`,
+                background: '#f8f9fa',
+                marginBottom: '10px',
+                borderRadius: '0 8px 8px 0',
+                fontSize: '14px'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
+                <div>
+                  <span style={{ fontWeight: 'bold' }}>
+                    {item.icono} {item.tipo === 'meteo' && 'Datos Meteorológicos'}
+                    {item.tipo === 'llm' && 'Consulta a la IA'}
+                    {item.tipo === 'alerta' && 'Alerta Emitida'}
+                  </span>
+                  {item.nickName && (
+                    <span style={{ marginLeft: '10px', background: '#e0e0e0', padding: '2px 8px', borderRadius: '12px', fontSize: '12px' }}>
+                      👤 {item.nickName}
+                    </span>
+                  )}
+                </div>
+                <span style={{ color: '#666', fontSize: '12px' }}>
+                  {new Date(item.created_at).toLocaleString('es-ES')}
+                </span>
+              </div>
+
+              {item.tipo === 'meteo' && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '10px' }}>
+                  <span>🌡️ Temp: {item.temperatura}°C</span>
+                  <span>💧 Humedad: {item.humedad}%</span>
+                  <span>☔ Lluvia: {item.precipitacion} mm</span>
+                  <span>💨 Viento: {item.viento} km/h</span>
+                </div>
+              )}
+
+              {item.tipo === 'llm' && (
+                <div style={{ marginTop: '10px' }}>
+                  <p style={{ background: 'white', padding: '10px', borderRadius: '5px', margin: 0 }}>
+                    {item.recomendacion.substring(0, 200)}...
+                  </p>
+                </div>
+              )}
+
+              {item.tipo === 'alerta' && (
+                <div style={{ marginTop: '10px' }}>
+                  <div style={{ color: '#c0392b' }}>
+                    <strong>⚠️ {item.mensaje}</strong>
+                  </div>
+                  <div style={{ fontSize: '12px', marginTop: '5px', color: '#666' }}>
+                    Provincia: {item.provincia || 'TODAS'} | Tipo: {item.tipo_alerta || 'CRITICA'}
+                  </div>
                 </div>
               )}
             </div>
@@ -175,17 +319,19 @@ function Dashboard({ usuario, onLogout }) {
         const dataAdmin = await resAdmin.json();
         if (resAdmin.ok && dataAdmin.length > 0) setAlertaOficial(dataAdmin[0]);
 
-        // 3. Registrar automáticamente la consulta meteorológica y de IA
-        // (Esto se maneja en el backend, pero podemos confirmar)
-        await fetch(`http://localhost:3000/api/registrar_consulta`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            nickName: usuario.nickName,
-            tipo: 'completa',
-            data: dataIA
-          })
-        });
+        // 3. Registrar automáticamente la consulta
+        if (resIA.ok) {
+          await fetch(`http://localhost:3000/api/registrar_consulta`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              nickName: usuario.nickName,
+              tipo: 'completa',
+              clima: dataIA.clima,
+              recomendacion: dataIA.recomendacion
+            })
+          });
+        }
 
       } catch (err) {
         console.error("Error cargando datos", err);
@@ -227,7 +373,15 @@ function Dashboard({ usuario, onLogout }) {
 
       {/* ALERTA OFICIAL */}
       {alertaOficial && (
-        <div style={{ background: '#ff4d4d', color: 'white', padding: '15px', borderRadius: '8px', marginTop: '20px', animation: 'pulse 2s infinite', border: '2px solid #b30000' }}>
+        <div style={{ 
+          background: '#ff4d4d', 
+          color: 'white', 
+          padding: '15px', 
+          borderRadius: '8px', 
+          marginTop: '20px', 
+          animation: 'pulse 2s infinite', 
+          border: '2px solid #b30000' 
+        }}>
           <h3 style={{ margin: '0' }}>⚠️ AVISO OFICIAL DE AUTORIDAD</h3>
           <p style={{ fontSize: '18px', fontWeight: 'bold' }}>{alertaOficial.mensaje}</p>
           <small>Publicado el: {new Date(alertaOficial.created_at).toLocaleString()}</small>
@@ -299,26 +453,19 @@ function Dashboard({ usuario, onLogout }) {
           )}
         </div>
       ) : (
-        <Historial usuario={usuario} />
+        <HistorialCiudadano usuario={usuario} />
       )}
     </div>
   );
 }
 
-// Panel de Admin (sin cambios)
+// ==========================================
+// 2. PANEL DE ADMIN (CON SU PROPIO HISTORIAL)
+// ==========================================
 function AdminPanel({ usuario, onLogout }) {
   const [mensaje, setMensaje] = useState("");
   const [enviado, setEnviado] = useState(false);
-  const [historialAlertas, setHistorialAlertas] = useState([]);
-
-  useEffect(() => {
-    const cargarAlertas = async () => {
-      const res = await fetch('http://localhost:3000/api/alertas_emitidas');
-      const data = await res.json();
-      setHistorialAlertas(data);
-    };
-    cargarAlertas();
-  }, [enviado]);
+  const [mostrarHistorial, setMostrarHistorial] = useState(false);
 
   const enviar = async () => {
     await fetch('http://localhost:3000/api/admin/alertar', {
@@ -338,65 +485,70 @@ function AdminPanel({ usuario, onLogout }) {
 
   return (
     <div style={{ padding: '20px', maxWidth: '900px', margin: '0 auto' }}>
-      <h2 style={{ display: 'flex', justifyContent: 'space-between' }}>
-        🛡️ Panel de Control: Backoffice
-        <button onClick={onLogout} style={{ background: '#e74c3c', color: 'white', border: 'none', padding: '5px 15px', borderRadius: '5px' }}>Salir</button>
-      </h2>
-      
-      <div style={{ background: '#f8f9fa', padding: '20px', borderRadius: '10px', marginBottom: '30px' }}>
-        <h3>Emitir Nueva Alerta</h3>
-        <textarea 
-          value={mensaje} 
-          onChange={(e) => setMensaje(e.target.value)} 
-          style={{ width: '100%', height: '100px', padding: '10px' }} 
-          placeholder="Escribe la alerta oficial (ej: 'Evacuar zonas cercanas al río')" 
-        />
-        <button 
-          onClick={enviar} 
-          style={{ 
-            background: '#d32f2f', 
-            color: 'white', 
-            padding: '10px 20px', 
-            border: 'none', 
-            cursor: 'pointer', 
-            marginTop: '10px',
-            borderRadius: '5px',
-            fontWeight: 'bold'
-          }}
-        >
-          🚨 EMITIR ALERTA A TODOS LOS CIUDADANOS
-        </button>
-        {enviado && <p style={{ color: 'green', marginTop: '10px' }}>✅ Alerta enviada correctamente</p>}
-      </div>
-
-      <div>
-        <h3>Historial de Alertas Emitidas</h3>
-        <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-          {historialAlertas.map((alerta, index) => (
-            <div key={index} style={{ 
-              background: '#fff3cd', 
-              border: '1px solid #ffeeba', 
-              padding: '15px', 
-              marginBottom: '10px',
-              borderRadius: '5px'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <strong>⚠️ {alerta.mensaje}</strong>
-                <span style={{ fontSize: '12px', color: '#856404' }}>
-                  {new Date(alerta.created_at).toLocaleString()}
-                </span>
-              </div>
-              <small>Emitida por: {alerta.admin}</small>
-            </div>
-          ))}
+      <header style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid #eee', paddingBottom: '10px' }}>
+        <h2>🛡️ Panel de Control: Backoffice</h2>
+        <div>
+          <button 
+            onClick={() => setMostrarHistorial(!mostrarHistorial)}
+            style={{ 
+              background: '#3498db', 
+              color: 'white', 
+              border: 'none', 
+              padding: '5px 15px', 
+              borderRadius: '5px', 
+              cursor: 'pointer',
+              marginRight: '10px'
+            }}
+          >
+            {mostrarHistorial ? '📊 Ocultar Historial Global' : '📊 Ver Historial Global'}
+          </button>
+          <button onClick={onLogout} style={{ background: '#e74c3c', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '5px', cursor: 'pointer' }}>Salir</button>
         </div>
-      </div>
+      </header>
+
+      {!mostrarHistorial ? (
+        <>
+          <div style={{ background: '#f8f9fa', padding: '20px', borderRadius: '10px', marginBottom: '30px', marginTop: '20px' }}>
+            <h3>Emitir Nueva Alerta</h3>
+            <textarea 
+              value={mensaje} 
+              onChange={(e) => setMensaje(e.target.value)} 
+              style={{ width: '100%', height: '100px', padding: '10px' }} 
+              placeholder="Escribe la alerta oficial (ej: 'Evacuar zonas cercanas al río')" 
+            />
+            <button 
+              onClick={enviar} 
+              style={{ 
+                background: '#d32f2f', 
+                color: 'white', 
+                padding: '10px 20px', 
+                border: 'none', 
+                cursor: 'pointer', 
+                marginTop: '10px',
+                borderRadius: '5px',
+                fontWeight: 'bold'
+              }}
+            >
+              🚨 EMITIR ALERTA A TODOS LOS CIUDADANOS
+            </button>
+            {enviado && <p style={{ color: 'green', marginTop: '10px' }}>✅ Alerta enviada correctamente</p>}
+          </div>
+
+          {/* Vista rápida de últimas alertas */}
+          <div>
+            <h3>Últimas Alertas Emitidas</h3>
+            {/* Aquí puedes mantener tu vista rápida de alertas si la tenías */}
+          </div>
+        </>
+      ) : (
+        <HistorialAdmin usuario={usuario} />
+      )}
     </div>
   );
 }
 
 // ==========================================
-// COMPONENTE PRINCIPAL (sin cambios)
+// 3. COMPONENTE PRINCIPAL (CON FONDO DE IMAGEN)
 // ==========================================
 function App() {
   const [isLogin, setIsLogin] = useState(false);
@@ -458,82 +610,103 @@ function App() {
     setFormData({ ...formData, password: '' });
   };
 
-  if (usuarioLogueado) {
-    return <Dashboard usuario={usuarioLogueado} onLogout={handleLogout} />;
-  }
-
+  // ======================
+  // FONDO DE IMAGEN INTEGRADO
+  // ======================
   return (
-    <div style={{ maxWidth: '500px', margin: '40px auto', fontFamily: 'system-ui, sans-serif' }}>
-      <div style={{ padding: '20px', border: '1px solid #ccc', borderRadius: '10px', boxShadow: '0 4px 8px rgba(0,0,0,0.1)' }}>
-        <h2 style={{ textAlign: 'center', color: '#2c3e50' }}>
-          {isLogin ? 'Iniciar Sesión' : 'Registro de Ciudadano'}
-        </h2>
+    <div style={{ 
+      minHeight: '100vh', 
+      width: '100%',
+      // Imagen de fondo (puedes cambiar la URL por la que quieras)
+      backgroundImage: `url('https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?q=80&w=1920')`,
+      backgroundSize: 'cover',     // La imagen cubre todo el espacio
+      backgroundPosition: 'center', // Centra la imagen
+      backgroundAttachment: 'fixed',// Fija el fondo al hacer scroll
+      backgroundRepeat: 'no-repeat' // No repite la imagen
+    }}>
+      {/* Capa semi-transparente para que el texto sea legible */}
+      <div style={{ 
+        backgroundColor: 'rgba(255, 255, 255, 0.85)', 
+        minHeight: '100vh', 
+        padding: '20px' 
+      }}>
+        {usuarioLogueado ? (
+          <Dashboard usuario={usuarioLogueado} onLogout={handleLogout} />
+        ) : (
+          <div style={{ maxWidth: '500px', margin: '40px auto', fontFamily: 'system-ui, sans-serif' }}>
+            <div style={{ padding: '20px', border: '1px solid #ccc', borderRadius: '10px', boxShadow: '0 4px 8px rgba(0,0,0,0.1)', backgroundColor: 'white' }}>
+              <h2 style={{ textAlign: 'center', color: '#2c3e50' }}>
+                {isLogin ? 'Iniciar Sesión' : 'Registro de Ciudadano'}
+              </h2>
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-          <div>
-            <label>Usuario (Nickname):</label>
-            <input type="text" name="nickName" value={formData.nickName} onChange={handleChange} required style={{ width: '100%', padding: '8px', marginTop: '5px' }} />
-          </div>
+              <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                <div>
+                  <label>Usuario (Nickname):</label>
+                  <input type="text" name="nickName" value={formData.nickName} onChange={handleChange} required style={{ width: '100%', padding: '8px', marginTop: '5px' }} />
+                </div>
 
-          <div>
-            <label>Contraseña:</label>
-            <input type="password" name="password" value={formData.password} onChange={handleChange} required style={{ width: '100%', padding: '8px', marginTop: '5px' }} />
-          </div>
+                <div>
+                  <label>Contraseña:</label>
+                  <input type="password" name="password" value={formData.password} onChange={handleChange} required style={{ width: '100%', padding: '8px', marginTop: '5px' }} />
+                </div>
 
-          {!isLogin && (
-            <>
-              <div>
-                <label>Rol:</label>
-                <select name="rol" value={formData.rol} onChange={handleChange} style={{ width: '100%', padding: '8px', marginTop: '5px' }}>
-                  <option value="ciudadano">Ciudadano</option>
-                  <option value="backoffice">Backoffice (Administrador)</option>
-                </select>
-              </div>
-
-              {formData.rol === 'ciudadano' && (
-                <>
-                  <div>
-                    <label>Provincia:</label>
-                    <input type="text" name="provincia" value={formData.provincia} onChange={handleChange} required style={{ width: '100%', padding: '8px', marginTop: '5px' }} placeholder="Ej: Madrid, Valencia..." />
-                  </div>
-
-                  <div>
-                    <label>Tipo de Vivienda:</label>
-                    <select name="tipoVivienda" value={formData.tipoVivienda} onChange={handleChange} required style={{ width: '100%', padding: '8px', marginTop: '5px' }}>
-                      <option value="">Selecciona una opción...</option>
-                      <option value="sotano">Sótano</option>
-                      <option value="planta_baja">Planta baja</option>
-                      <option value="piso_alto">Piso alto</option>
-                      <option value="casa_campo">Casa de campo</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label>Información adicional:</label>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginTop: '5px' }}>
-                      <label><input type="checkbox" name="sillaRuedas" checked={formData.necesidades.sillaRuedas} onChange={handleCheckboxChange} /> Silla de ruedas</label>
-                      <label><input type="checkbox" name="dependiente" checked={formData.necesidades.dependiente} onChange={handleCheckboxChange} /> Persona dependiente</label>
-                      <label><input type="checkbox" name="mascotas" checked={formData.necesidades.mascotas} onChange={handleCheckboxChange} /> Mascotas</label>
-                      <label><input type="checkbox" name="ascensor" checked={formData.necesidades.ascensor} onChange={handleCheckboxChange} /> Ascensor</label>
-                      <label><input type="checkbox" name="niños" checked={formData.necesidades.niños} onChange={handleCheckboxChange} /> Niños</label>
+                {!isLogin && (
+                  <>
+                    <div>
+                      <label>Rol:</label>
+                      <select name="rol" value={formData.rol} onChange={handleChange} style={{ width: '100%', padding: '8px', marginTop: '5px' }}>
+                        <option value="ciudadano">Ciudadano</option>
+                        <option value="backoffice">Backoffice (Administrador)</option>
+                      </select>
                     </div>
-                  </div>
-                </>
-              )}
-            </>
-          )}
 
-          <button type="submit" style={{ padding: '10px', backgroundColor: '#3498db', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '16px', marginTop: '10px' }}>
-            {isLogin ? 'Entrar' : 'Registrarme'}
-          </button>
-        </form>
+                    {formData.rol === 'ciudadano' && (
+                      <>
+                        <div>
+                          <label>Provincia:</label>
+                          <input type="text" name="provincia" value={formData.provincia} onChange={handleChange} required style={{ width: '100%', padding: '8px', marginTop: '5px' }} placeholder="Ej: Madrid, Valencia..." />
+                        </div>
 
-        <p style={{ textAlign: 'center', marginTop: '20px', fontSize: '14px' }}>
-          {isLogin ? "¿No tienes cuenta? " : "¿Ya tienes cuenta? "}
-          <button onClick={() => setIsLogin(!isLogin)} style={{ background: 'none', border: 'none', color: '#3498db', textDecoration: 'underline', cursor: 'pointer' }}>
-            {isLogin ? "Regístrate aquí" : "Inicia sesión aquí"}
-          </button>
-        </p>
+                        <div>
+                          <label>Tipo de Vivienda:</label>
+                          <select name="tipoVivienda" value={formData.tipoVivienda} onChange={handleChange} required style={{ width: '100%', padding: '8px', marginTop: '5px' }}>
+                            <option value="">Selecciona una opción...</option>
+                            <option value="sotano">Sótano</option>
+                            <option value="planta_baja">Planta baja</option>
+                            <option value="piso_alto">Piso alto</option>
+                            <option value="casa_campo">Casa de campo</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label>Información adicional:</label>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginTop: '5px' }}>
+                            <label><input type="checkbox" name="sillaRuedas" checked={formData.necesidades.sillaRuedas} onChange={handleCheckboxChange} /> Silla de ruedas</label>
+                            <label><input type="checkbox" name="dependiente" checked={formData.necesidades.dependiente} onChange={handleCheckboxChange} /> Persona dependiente</label>
+                            <label><input type="checkbox" name="mascotas" checked={formData.necesidades.mascotas} onChange={handleCheckboxChange} /> Mascotas</label>
+                            <label><input type="checkbox" name="ascensor" checked={formData.necesidades.ascensor} onChange={handleCheckboxChange} /> Ascensor</label>
+                            <label><input type="checkbox" name="niños" checked={formData.necesidades.niños} onChange={handleCheckboxChange} /> Niños</label>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
+
+                <button type="submit" style={{ padding: '10px', backgroundColor: '#3498db', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '16px', marginTop: '10px' }}>
+                  {isLogin ? 'Entrar' : 'Registrarme'}
+                </button>
+              </form>
+
+              <p style={{ textAlign: 'center', marginTop: '20px', fontSize: '14px' }}>
+                {isLogin ? "¿No tienes cuenta? " : "¿Ya tienes cuenta? "}
+                <button onClick={() => setIsLogin(!isLogin)} style={{ background: 'none', border: 'none', color: '#3498db', textDecoration: 'underline', cursor: 'pointer' }}>
+                  {isLogin ? "Regístrate aquí" : "Inicia sesión aquí"}
+                </button>
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
