@@ -13,3 +13,10 @@ def alertar
 
   render json: { status: "Alerta emitida" }
 end
+
+# app/controllers/api/admin_controller.rb
+def usuarios
+  usuarios = Usuario.all.pluck(:nickName, :rol)
+  render json: usuarios.map { |nick, rol| { nickName: nick, rol: rol } }
+end
+

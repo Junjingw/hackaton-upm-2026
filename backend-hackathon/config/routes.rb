@@ -27,4 +27,5 @@ Rails.application.routes.draw do
 
   get '/api/historial/:nickName', to: 'emergencias#obtener_historial'
   get '/api/historial_completo/:nickName', to: 'emergencias#historial_completo'
+  get '/api/admin/usuarios', to: 'api/admin#usuarios'
 end

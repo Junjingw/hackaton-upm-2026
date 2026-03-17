@@ -54,16 +54,37 @@ const RenderizarRespuestaIA = ({ texto }) => {
 // ==========================================
 // NUEVO: COMPONENTE HISTORIAL DE ACTIVIDAD COMPLETO (CON FILTROS)
 // ==========================================
-const HistorialActividad = ({ usuario }) => {
+const HistorialActividad = ({ usuario, nickNameSeleccionado }) => {
   const [actividades, setActividades] = useState([]);
   const [filtro, setFiltro] = useState('Todos');
   const [cargando, setCargando] = useState(true);
+  const [usuarios, setUsuarios] = useState([]); // Para admin: lista de usuarios
+
+  // Para admin: cargar lista de usuarios
+  useEffect(() => {
+    if (usuario.rol === 'backoffice') {
+      const cargarUsuarios = async () => {
+        try {
+          const res = await fetch(`http://localhost:3000/api/admin/usuarios`);
+          const data = await res.json();
+          setUsuarios(data);
+        } catch (error) {
+          console.error("Error cargando usuarios:", error);
+        }
+      };
+      cargarUsuarios();
+    }
+  }, [usuario.rol]);
 
   const cargarActividad = async () => {
     try {
       setCargando(true);
-      // Obtener datos del endpoint de historial completo
-      const res = await fetch(`http://localhost:3000/api/historial_completo/${usuario.nickName}`);
+      // Para admin: usar nickName seleccionado, para ciudadano: su propio nickName
+      const nickName = usuario.rol === 'backoffice' && nickNameSeleccionado 
+        ? nickNameSeleccionado 
+        : usuario.nickName;
+      
+      const res = await fetch(`http://localhost:3000/api/historial_completo/${nickName}`);
       const data = await res.json();
       setActividades(data);
     } catch (error) {
@@ -76,7 +97,7 @@ const HistorialActividad = ({ usuario }) => {
 
   useEffect(() => { 
     cargarActividad(); 
-  }, [usuario.nickName]);
+  }, [usuario.nickName, nickNameSeleccionado]);
 
   // Lógica de filtrado (adaptada para cubrir todos los tipos)
   const actividadesFiltradas = actividades.filter(item => {
@@ -127,7 +148,28 @@ const HistorialActividad = ({ usuario }) => {
       boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
       marginTop: '20px'
     }}>
-      <h3 style={{ margin: '0 0 15px 0' }}>📋 Historial de Actividad ({actividadesFiltradas.length} registros)</h3>
+      {/* Selector de usuario para admin */}
+      {usuario.rol === 'backoffice' && (
+        <div style={{ marginBottom: '15px', display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <label style={{ fontWeight: 'bold', color: '#2c3e50' }}>Ver historial de:</label>
+          <select 
+            value={nickNameSeleccionado || ''}
+            onChange={(e) => setNickNameSeleccionado(e.target.value)}
+            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #ddd', flex: 1, maxWidth: '300px' }}
+          >
+            <option value="">Selecciona un usuario...</option>
+            {usuarios.map((user) => (
+              <option key={user.nickName} value={user.nickName}>{user.nickName} ({user.rol})</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      <h3 style={{ margin: '0 0 15px 0' }}>
+        📋 Historial de Actividad 
+        ({usuario.rol === 'backoffice' && nickNameSeleccionado ? `Usuario: ${nickNameSeleccionado} - ` : ''}
+        {actividadesFiltradas.length} registros)
+      </h3>
       
       {/* BOTONES DE FILTRO */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
@@ -638,12 +680,14 @@ function Dashboard({ usuario, onLogout }) {
 }
 
 // ==========================================
-// 2. PANEL DE ADMIN ACTUALIZADO
+// 2. PANEL DE ADMIN ACTUALIZADO (CON HISTORIAL DE ACTIVIDAD)
 // ==========================================
 function AdminPanel({ usuario, onLogout }) {
   const [mensaje, setMensaje] = useState("");
   const [enviado, setEnviado] = useState(false);
   const [mostrarHistorialGeneral, setMostrarHistorialGeneral] = useState(false);
+  const [mostrarHistorialActividad, setMostrarHistorialActividad] = useState(false);
+  const [nickNameSeleccionado, setNickNameSeleccionado] = useState(""); // Para seleccionar usuario en HistorialActividad
 
   // Historial de consultas admin
   const [historialConsultasAdmin, setHistorialConsultasAdmin] = useState([]);
@@ -737,26 +781,53 @@ function AdminPanel({ usuario, onLogout }) {
     <div style={{ padding: '20px', maxWidth: '900px', margin: '0 auto', fontFamily: 'system-ui' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid #eee', paddingBottom: '10px' }}>
         <h2>🛡️ Panel de Control: Backoffice</h2>
-        <div>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          {/* Botón para Historial de Actividad (por usuario) */}
           <button 
-            onClick={() => setMostrarHistorialGeneral(!mostrarHistorialGeneral)}
+            onClick={() => {
+              setMostrarHistorialActividad(!mostrarHistorialActividad);
+              setMostrarHistorialGeneral(false); // Ocultar historial global si se abre este
+            }}
+            style={{ 
+              background: '#2ecc71', 
+              color: 'white', 
+              border: 'none', 
+              padding: '5px 15px', 
+              borderRadius: '5px', 
+              cursor: 'pointer'
+            }}
+          >
+            {mostrarHistorialActividad ? '👤 Ocultar Historial de Usuario' : '👤 Ver Historial de Usuario'}
+          </button>
+          
+          {/* Botón para Historial Global del Sistema */}
+          <button 
+            onClick={() => {
+              setMostrarHistorialGeneral(!mostrarHistorialGeneral);
+              setMostrarHistorialActividad(false); // Ocultar historial de usuario si se abre este
+            }}
             style={{ 
               background: '#3498db', 
               color: 'white', 
               border: 'none', 
               padding: '5px 15px', 
               borderRadius: '5px', 
-              cursor: 'pointer',
-              marginRight: '10px'
+              cursor: 'pointer'
             }}
           >
             {mostrarHistorialGeneral ? '📊 Ocultar Historial Global' : '📊 Ver Historial Global'}
           </button>
+          
           <button onClick={onLogout} style={{ background: '#e74c3c', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '5px', cursor: 'pointer' }}>Salir</button>
         </div>
       </header>
 
-      {!mostrarHistorialGeneral ? (
+      {/* Mostrar Historial de Actividad (por usuario) o Historial Global o Panel Principal */}
+      {mostrarHistorialActividad ? (
+        <HistorialActividad usuario={usuario} nickNameSeleccionado={nickNameSeleccionado} />
+      ) : mostrarHistorialGeneral ? (
+        <HistorialAdmin usuario={usuario} />
+      ) : (
         <div style={{ maxWidth: '800px', margin: '0 auto' }}>
           
           {/* PANEL PARA ENVIAR ALERTAS */}
@@ -900,10 +971,7 @@ function AdminPanel({ usuario, onLogout }) {
               </div>
             </>
           )}
-
         </div>
-      ) : (
-        <HistorialAdmin usuario={usuario} />
       )}
     </div>
   );
