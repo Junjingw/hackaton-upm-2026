@@ -15,4 +15,11 @@ Rails.application.routes.draw do
   
   # Nueva ruta para pedir los datos de emergencia
   get '/api/emergencias/:nickName', to: 'emergencias#obtener_datos'
+  # Rutas para el Administrador
+  get '/api/admin/clima', to: 'backoffice#clima_general'
+  post '/api/admin/alertar', to: 'backoffice#emitir_alerta'
+  get '/api/admin/historial', to: 'backoffice#historial_alertas'
+  
+  # Ruta para que el ciudadano vea la última alerta oficial
+  get '/api/alerta_oficial', to: 'backoffice#historial_alertas'
 end
