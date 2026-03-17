@@ -408,3 +408,25 @@ class EmergenciasController < ApplicationController
     end
   end
 end
+
+
+
+def preguntar
+  user = User.find_by(nickName: params[:nickName])
+  pregunta_ciudadano = params[:pregunta]
+
+  # Recuperamos los datos del clima actuales (puedes reutilizar tu lógica)
+  clima_data = obtener_clima_actual # (asumiendo que tienes este método extraído)
+
+  # Creamos un prompt que combine la situación real con la duda del usuario
+  prompt_personalizado = "El ciudadano pregunta: '#{pregunta_ciudadano}'. " \
+                         "Contexto: Vive en un #{user.tipoVivienda} en #{user.provincia}. " \
+                         "Clima actual: #{clima_data['prec']}mm de lluvia. " \
+                         "Responde de forma breve y priorizando su seguridad."
+
+  # Llamada a Amazon Bedrock
+  # (Usa el mismo código de llamada que ya tienes para la recomendación automática)
+  llm_response = llamar_a_bedrock(prompt_personalizado)
+
+  render json: { recomendacion: llm_response }
+end

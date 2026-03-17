@@ -22,4 +22,6 @@ Rails.application.routes.draw do
   
   # Ruta para que el ciudadano vea la última alerta oficial
   get '/api/alerta_oficial', to: 'backoffice#historial_alertas'
+
+  post '/api/preguntar', to: 'emergencias#preguntar'
 end
