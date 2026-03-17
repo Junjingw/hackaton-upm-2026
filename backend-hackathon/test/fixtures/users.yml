@@ -1,0 +1,17 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  nickName: MyString
+  password_digest: MyString
+  rol: MyString
+  provincia: MyString
+  tipoVivienda: MyString
+  necesidades: 
+
+two:
+  nickName: MyString
+  password_digest: MyString
+  rol: MyString
+  provincia: MyString
+  tipoVivienda: MyString
+  necesidades: 
